@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 
+// models/Post.js
 const PostSchema = new mongoose.Schema({
   title: String,
   content: String,
@@ -9,4 +10,3 @@ const PostSchema = new mongoose.Schema({
 });
 
 export default mongoose.models.Post || mongoose.model("Post", PostSchema);
-

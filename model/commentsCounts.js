@@ -8,4 +8,6 @@ const CommentSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
   });
   
-  export default mongoose.models.Comment || mongoose.model("Commentcount", CommentSchema);
+  const commentsCounts =  mongoose.models.Comment || mongoose.model("Commentcount", CommentSchema);
+
+  export default commentsCounts;
