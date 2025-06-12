@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import connectDB from './lib/db.js';
 
-import CommentSchema from './models/Comment.js';
+import CommentSchema from './model/commentsCounts.js';
 import LikeSchema from './models/Like.js';
 
 const app = express();
