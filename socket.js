@@ -4,8 +4,8 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import connectDB from './lib/db.js';
 
-import CommentSchema from './models/Comment.js';
-import LikeSchema from './models/Like.js';
+import commentsCounts from './model/commentsCounts.js';
+import Like from './model/likes.js';
 
 const app = express();
 app.use(cors());
@@ -28,7 +28,7 @@ app.get('/', (req, res) => {
 app.get('/comments/:postId', async (req, res) => {
   try {
     const { postId } = req.params;
-    const comments = await CommentSchema.find({ postId }).sort({ createdAt: -1 }).lean();
+    const comments = await commentsCounts.find({ postId }).sort({ createdAt: -1 }).lean();
     res.status(200).json(comments);
   } catch {
     res.status(500).json({ error: 'Failed to fetch comments' });
@@ -38,7 +38,7 @@ app.get('/comments/:postId', async (req, res) => {
 // ✅ GET comment count for a post
 app.get('/comment-count/:postId', async (req, res) => {
   try {
-    const count = await CommentSchema.countDocuments({ postId: req.params.postId });
+    const count = await commentsCounts.countDocuments({ postId: req.params.postId });
     res.status(200).json({ count });
   } catch {
     res.status(500).json({ error: 'Failed to count comments' });
@@ -49,7 +49,7 @@ app.get('/comment-count/:postId', async (req, res) => {
 app.post('/comment', async (req, res) => {
   try {
     const { postId, comment, userId, userName } = req.body;
-    const newComment = new CommentSchema({ postId, comment, userId, userName });
+    const newComment = new commentsCounts({ postId, comment, userId, userName });
     await newComment.save();
     res.status(201).json(newComment);
     io.emit('post-commented', newComment);
@@ -61,7 +61,7 @@ app.post('/comment', async (req, res) => {
 // ✅ GET like count for a post
 app.get('/like-count/:postId', async (req, res) => {
   try {
-    const count = await LikeSchema.countDocuments({ postId: req.params.postId });
+    const count = await Like.countDocuments({ postId: req.params.postId });
     res.status(200).json({ count });
   } catch {
     res.status(500).json({ error: 'Failed to count likes' });
@@ -72,7 +72,7 @@ app.get('/like-count/:postId', async (req, res) => {
 app.post('/like', async (req, res) => {
   try {
     const { postId, userId } = req.body;
-    const existing = await LikeSchema.findOne({ postId, userId });
+    const existing = await Like.findOne({ postId, userId });
     if (existing) {
       await existing.deleteOne();
       io.emit('post-unliked', { postId, userId });
