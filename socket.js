@@ -2,16 +2,13 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import mongoose from 'mongoose';
 import connectDB from './lib/db.js';
-
-import commentsCounts from './model/commentsCounts.js';
+import Post from './model/comments.js';
+import Comment from './model/commentsCounts.js';
 import Like from './model/likes.js';
 
 const app = express();
-app.use(cors());
-app.use(express.json());
-connectDB();
-
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -20,55 +17,68 @@ const io = new Server(server, {
   },
 });
 
+app.use(cors());
+app.use(express.json());
+
+connectDB();
+
+// ✅ Welcome route
 app.get('/', (req, res) => {
-  res.send('<h1>Welcome to the Boosters Socket.IO Server</h1>');
+  res.send('<h1>Boosters Socket.IO Server is Live</h1>');
 });
 
-// ✅ GET all comments for a post
-app.get('/comments/:postId', async (req, res) => {
+app.get('/post/:postId/details', async (req, res) => {
   try {
-    const { postId } = req.params;
-    const comments = await commentsCounts.find({ postId }).sort({ createdAt: -1 }).lean();
-    res.status(200).json(comments);
-  } catch {
-    res.status(500).json({ error: 'Failed to fetch comments' });
+    const postId = mongoose.Types.ObjectId(req.params.postId);
+
+    const post = await Post.findById(postId)
+      .populate('User_id', 'fullName email avatar')
+      .lean();
+
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const comments = await Comment.find({ postId }).sort({ createdAt: -1 }).lean();
+    const likeCount = await Like.countDocuments({ postId });
+
+    res.status(200).json({
+      post,
+      comments,
+      likeCount,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch post details' });
   }
 });
-
-// ✅ GET comment count for a post
 app.get('/comment-count/:postId', async (req, res) => {
   try {
-    const count = await commentsCounts.countDocuments({ postId: req.params.postId });
+    const postId = req.params.postId;
+    const count = await Comment.countDocuments({ postId });
     res.status(200).json({ count });
-  } catch {
-    res.status(500).json({ error: 'Failed to count comments' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch comment count' });
   }
 });
 
-// ✅ POST a new comment
 app.post('/comment', async (req, res) => {
   try {
     const { postId, comment, userId, userName } = req.body;
-    const newComment = new commentsCounts({ postId, comment, userId, userName });
+    const newComment = new Comment({
+      postId,
+      content: comment,
+      userId,
+      userName,
+    });
     await newComment.save();
-    res.status(201).json(newComment);
     io.emit('post-commented', newComment);
-  } catch {
-    res.status(500).json({ error: 'Failed to save comment' });
+    res.status(201).json(newComment);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to add comment' });
   }
 });
 
-// ✅ GET like count for a post
-app.get('/like-count/:postId', async (req, res) => {
-  try {
-    const count = await Like.countDocuments({ postId: req.params.postId });
-    res.status(200).json({ count });
-  } catch {
-    res.status(500).json({ error: 'Failed to count likes' });
-  }
-});
-
-// ✅ POST or TOGGLE like
 app.post('/like', async (req, res) => {
   try {
     const { postId, userId } = req.body;
@@ -83,20 +93,32 @@ app.post('/like', async (req, res) => {
       io.emit('post-liked', newLike);
       return res.status(201).json({ liked: true });
     }
-  } catch {
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Failed to toggle like' });
   }
 });
 
-// ✅ SOCKET.IO
-io.on('connection', (socket) => {
-  // console.log(`User connected: ${socket.id}`);
+app.get('/like-count/:postId', async (req, res) => {
+  try {
+    const postId = req.params.postId;
+    const count = await Like.countDocuments({ postId });
+    res.status(200).json({ count });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch like count' });
+  }
+});
 
+io.on('connection', (socket) => {
+  console.log(`Socket connected: ${socket.id}`);
   socket.on('disconnect', () => {
-    // console.log(`User disconnected: ${socket.id}`);
+    console.log(`Socket disconnected: ${socket.id}`);
   });
 });
 
-server.listen(22628, () => {
-  // console.log('Server is running on port 22628');
+// ✅ Start server
+const PORT = process.env.PORT || 22628;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
